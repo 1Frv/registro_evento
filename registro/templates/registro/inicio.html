@@ -76,10 +76,12 @@ button:disabled{opacity:.6;cursor:wait}
     <h2>Nuevo registro</h2>
     <form id="f" autocomplete="off">
       <label for="nombre">Nombre completo *</label><input id="nombre" type="text" required maxlength="150" autocapitalize="characters" data-f="txt">
-      <label for="institucion">Institución / Empresa / Municipio *</label><input id="institucion" type="text" required maxlength="150" autocapitalize="characters" data-f="txt">
+      <label for="institucion">Institución / Empresa / Municipio *</label><input id="institucion" type="text" required maxlength="150" autocapitalize="characters" data-f="inst" placeholder="Ej.: SECRETARÍA DE ECONOMÍA (SEDECO)">
       <label for="cargo">Cargo *</label><input id="cargo" type="text" required maxlength="100" autocapitalize="characters" data-f="txt">
       <label for="correo">Correo electrónico</label><input id="correo" type="email">
       <label for="telefono">Teléfono</label><input id="telefono" type="tel" inputmode="numeric" maxlength="10" data-f="tel">
+      <label class="aviso"><input id="esOficina" type="checkbox"> Es teléfono de oficina (agregar extensión)</label>
+      <div id="bloqueExt" hidden><label for="extension">Extensión</label><input id="extension" type="tel" inputmode="numeric" maxlength="6" data-f="ext"></div>
       <label>Firma (con el dedo, lápiz o mouse) *</label>
       <div class="pad"><canvas id="firma"></canvas></div>
       <label class="aviso"><input id="aviso" type="checkbox"> Acepto el aviso de privacidad y el uso de mis datos para el control de asistencia de este evento.</label>
@@ -151,14 +153,15 @@ cv.onpointerup=cv.onpointercancel=()=>dib=false;
 $('#clr').onclick=ajustar;addEventListener('resize',()=>{if(!sucio)ajustar()});ajustar();
 function firmaPNG(){const c=document.createElement('canvas');c.width=600;c.height=240;c.getContext('2d').drawImage(cv,0,0,600,240);return c.toDataURL('image/png')}
 // Mayúsculas automáticas y solo letras/espacios (texto); solo números, máx. 10 (teléfono)
-const F={txt:v=>v.toUpperCase().replace(/[^A-ZÁÉÍÓÚÜÑ ]/g,'').replace(/^ +/,'').replace(/ {2,}/g,' '),tel:v=>v.replace(/\D/g,'').slice(0,10)};
+const F={txt:v=>v.toUpperCase().replace(/[^A-ZÁÉÍÓÚÜÑ ]/g,'').replace(/^ +/,'').replace(/ {2,}/g,' '),tel:v=>v.replace(/\D/g,'').slice(0,10),ext:v=>v.replace(/\D/g,'').slice(0,6),inst:v=>v.toUpperCase().replace(/[<>=|{}^~$]/g,'').replace(/^[^\p{L}\p{N}]+/u,'').replace(/ {2,}/g,' ')};
 document.querySelectorAll('[data-f]').forEach(el=>el.addEventListener('input',()=>{const f=F[el.dataset.f],p=el.selectionStart,v=f(el.value);if(v!==el.value){const q=f(el.value.slice(0,p)).length;el.value=v;el.setSelectionRange(q,q)}}));
+$('#esOficina').onchange=e=>{$('#bloqueExt').hidden=!e.target.checked;if(e.target.checked)$('#extension').focus();else $('#extension').value=''};
 const enviar=d=>fetch('/guardar/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},body:JSON.stringify(d)});
 $('#f').onsubmit=async e=>{
   e.preventDefault();
   if(!sucio)return msg('Falta la firma','err');
   const d={aviso:$('#aviso').checked,firma:firmaPNG()};
-  ['nombre','institucion','cargo','correo','telefono'].forEach(k=>d[k]=$('#'+k).value);
+  ['nombre','institucion','cargo','correo','telefono','extension'].forEach(k=>d[k]=$('#'+k).value);
   const bt=$('#f button[type=submit]');bt.disabled=true;
   try{
     let r=await enviar(d);

@@ -9,6 +9,7 @@ class Asistente(models.Model):
     cargo = models.CharField(max_length=100, blank=True)
     correo = models.EmailField(blank=True)
     telefono = models.CharField("teléfono", max_length=30, blank=True)
+    extension = models.CharField("extensión", max_length=6, blank=True)
     firma = models.BinaryField()
     aviso_aceptado = models.BooleanField(default=False)
     creado = models.DateTimeField(auto_now_add=True)

@@ -20,6 +20,8 @@ from .models import Asistente
 PREFIJO = "data:image/png;base64,"
 POR_PAGINA = 10
 SOLO_LETRAS = re.compile(r"^[^\W\d_]+(?: [^\W\d_]+)*$")  # letras (con acentos y ñ) separadas por un espacio
+# Institución: debe iniciar con letra o número; admite paréntesis, puntos, guiones, diagonales, etc.
+INSTITUCION = re.compile(r"^[^\W_][^<>=|{}^~$\x00-\x1f]*$")
 ETIQUETAS = {"nombre": "El nombre", "institucion": "La institución / empresa / municipio", "cargo": "El cargo"}
 
 
@@ -60,6 +62,7 @@ def guardar(request):
         return JsonResponse({"error": "Datos inválidos"}, status=400)
     nombre, institucion, cargo = (_limpio(d, c) for c in ("nombre", "institucion", "cargo"))
     telefono = str(d.get("telefono", "")).strip()
+    extension = str(d.get("extension", "")).strip()
     correo = str(d.get("correo", "")).strip().lower()
     firma = _firma_valida(str(d.get("firma", "")))
     if not nombre:
@@ -68,11 +71,17 @@ def guardar(request):
         return JsonResponse({"error": "La institución / empresa / municipio es obligatoria"}, status=400)
     if not cargo:
         return JsonResponse({"error": "El cargo es obligatorio"}, status=400)
-    for campo, valor in (("nombre", nombre), ("institucion", institucion), ("cargo", cargo)):
+    if not INSTITUCION.match(institucion):
+        return JsonResponse({"error": "La institución / empresa / municipio debe iniciar con letra o número y no admite los símbolos < > = | { } ^ ~ $"}, status=400)
+    for campo, valor in (("nombre", nombre), ("cargo", cargo)):
         if valor and not SOLO_LETRAS.match(valor):
             return JsonResponse({"error": f"{ETIQUETAS[campo]} solo admite letras y espacios"}, status=400)
     if telefono and not (telefono.isascii() and telefono.isdigit() and len(telefono) <= 10):
         return JsonResponse({"error": "El teléfono solo admite números, máximo 10 dígitos"}, status=400)
+    if extension and not (extension.isascii() and extension.isdigit() and len(extension) <= 6):
+        return JsonResponse({"error": "La extensión solo admite números, máximo 6 dígitos"}, status=400)
+    if extension and not telefono:
+        return JsonResponse({"error": "Para agregar una extensión escribe el teléfono de la oficina"}, status=400)
     if not firma:
         return JsonResponse({"error": "Falta la firma"}, status=400)
     if not d.get("aviso"):
@@ -89,13 +98,13 @@ def guardar(request):
             repetidos.append("nombre")
         if correo and activos.filter(correo__iexact=correo).exists():
             repetidos.append("correo")
-        if telefono and activos.filter(telefono=telefono).exists():
+        if telefono and activos.filter(telefono=telefono, extension=extension).exists():
             repetidos.append("teléfono")
         if repetidos:
             return JsonResponse({"duplicado": True, "campos": repetidos}, status=409)
     Asistente.objects.create(
         nombre=nombre[:150], institucion=institucion[:150], cargo=cargo[:100],
-        correo=correo, telefono=telefono, firma=firma, aviso_aceptado=True)
+        correo=correo, telefono=telefono, extension=extension, firma=firma, aviso_aceptado=True)
     total = Asistente.objects.filter(anulado=False).count()
     if total % settings.RESPALDO_CADA == 0:
         servicios.respaldar()

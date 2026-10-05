@@ -44,7 +44,7 @@ def exportar_xlsx():
     ws = wb.active
     ws.title = "Asistentes"
     cols = [("Folio", 8), ("Fecha y hora", 18), ("Nombre", 30), ("Institución / Empresa / Municipio", 36),
-            ("Cargo", 22), ("Correo", 28), ("Teléfono", 16), ("Firma", 26)]
+            ("Cargo", 22), ("Correo", 28), ("Teléfono", 16), ("Extensión", 12), ("Firma", 26)]
     ws.append([c for c, _ in cols])
     for i, (_, ancho) in enumerate(cols):
         ws.column_dimensions[chr(65 + i)].width = ancho
@@ -53,13 +53,15 @@ def exportar_xlsx():
     ws.freeze_panes = "A2"
     for fila, a in enumerate(Asistente.objects.filter(anulado=False).order_by("id"), start=2):
         ws.append([a.id, timezone.localtime(a.creado).strftime("%d/%m/%Y %H:%M"),
-                   a.nombre, a.institucion, a.cargo, a.correo, a.telefono])
+                   a.nombre, a.institucion, a.cargo, a.correo, a.telefono, a.extension])
         ws.row_dimensions[fila].height = 52
         for celda in ws[fila]:
             celda.alignment = Alignment(vertical="center", wrap_text=True)
+            if isinstance(celda.value, str):
+                celda.data_type = "s"  # texto literal: nunca se interpreta como fórmula
         img = XLImage(io.BytesIO(bytes(a.firma)))
         img.width, img.height = 150, 60
-        ws.add_image(img, f"H{fila}")
+        ws.add_image(img, f"{chr(64 + len(cols))}{fila}")
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
