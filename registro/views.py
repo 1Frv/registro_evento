@@ -6,6 +6,7 @@ import re
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 from django.core.validators import validate_email
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -17,6 +18,7 @@ from . import servicios
 from .models import Asistente
 
 PREFIJO = "data:image/png;base64,"
+POR_PAGINA = 10
 SOLO_LETRAS = re.compile(r"^[^\W\d_]+(?: [^\W\d_]+)*$")  # letras (con acentos y ñ) separadas por un espacio
 ETIQUETAS = {"nombre": "El nombre", "institucion": "La institución / empresa / municipio", "cargo": "El cargo"}
 
@@ -44,8 +46,9 @@ def _firma_valida(dato):
 def inicio(request):
     q = request.GET.get("q", "").strip()
     activos = Asistente.objects.filter(anulado=False)
-    lista = (activos.filter(nombre__icontains=q) if q else activos)[:200]
-    return render(request, "registro/inicio.html", {"lista": lista, "total": activos.count(), "q": q})
+    filtrados = activos.filter(nombre__icontains=q) if q else activos
+    pagina = Paginator(filtrados, POR_PAGINA).get_page(request.GET.get("p"))  # solo 25 firmas por carga
+    return render(request, "registro/inicio.html", {"pagina": pagina, "total": activos.count(), "q": q})
 
 
 @login_required
